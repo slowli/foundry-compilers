@@ -53,6 +53,13 @@ pub use filter::{
 };
 use solang_parser::pt::SourceUnitPart;
 
+pub mod zksync;
+use zksync::{
+    artifact_output::zk::ZkArtifactOutput,
+    compile::{output::ProjectCompileOutput as ZkProjectCompileOutput, ZkSolc},
+    config::ZkSolcConfig,
+};
+
 pub mod report;
 
 pub mod utils;
@@ -121,6 +128,12 @@ pub struct Project<C: Compiler = Solc, T: ArtifactOutput = ConfigurableArtifacts
     ///
     /// This is a noop on other platforms
     pub slash_paths: bool,
+
+    /// Where to find zksolc
+    pub zksync_zksolc: ZkSolc,
+    pub zksync_zksolc_config: ZkSolcConfig,
+    pub zksync_artifacts: ZkArtifactOutput,
+    pub zksync_avoid_contracts: Option<Vec<globset::GlobMatcher>>,
 }
 
 impl Project {
@@ -554,6 +567,73 @@ impl<T: ArtifactOutput, C: Compiler> Project<C, T> {
 
         Ok(paths.remove(0))
     }
+
+    /// Returns the path to the artifacts directory
+    pub fn zksync_artifacts_path(&self) -> &PathBuf {
+        &self.paths.zksync_artifacts
+    }
+
+    /// Returns the path to the cache file
+    pub fn zksync_cache_path(&self) -> &PathBuf {
+        &self.paths.zksync_cache
+    }
+
+    #[instrument(skip_all, name = "zksync_compile")]
+    pub fn zksync_compile(&self) -> Result<ZkProjectCompileOutput> {
+        let sources = match self.zksync_avoid_contracts {
+            Some(ref contracts_to_avoid) => Source::read_all(
+                self.paths
+                    .input_files()
+                    .into_iter()
+                    .filter(|p| !contracts_to_avoid.iter().any(|c| c.is_match(p))),
+            )?,
+            None => self.paths.read_input_files()?,
+        };
+        trace!("found {} sources to compile: {:?}", sources.len(), sources.keys());
+
+        #[cfg(feature = "svm-solc")]
+        if self.auto_detect {
+            trace!("using solc auto detection to compile sources");
+            return self.zksync_svm_compile(sources);
+        }
+
+        self.zksync_compile_with_solc_version(&self.solc, sources)
+    }
+
+    pub fn zksync_compile_with_solc_version(
+        &self,
+        solc: &Solc,
+        sources: Sources,
+    ) -> Result<ZkProjectCompileOutput> {
+        zksync::compile::project::ProjectCompiler::with_sources_and_solc(
+            self,
+            sources,
+            solc.clone(),
+        )?
+        .compile()
+    }
+
+    #[cfg(feature = "svm-solc")]
+    pub fn zksync_svm_compile(&self, sources: Sources) -> Result<ZkProjectCompileOutput> {
+        zksync::compile::project::ProjectCompiler::with_sources(self, sources)?.compile()
+    }
+
+    pub fn zksync_compile_files<P, I>(&self, files: I) -> Result<ZkProjectCompileOutput>
+    where
+        I: IntoIterator<Item = P>,
+        P: Into<PathBuf>,
+    {
+        let sources = Source::read_all(files)?;
+
+        #[cfg(feature = "svm-solc")]
+        if self.auto_detect {
+            return zksync::compile::project::ProjectCompiler::with_sources(self, sources)?
+                .compile();
+        }
+
+        let solc = self.configure_solc(self.solc.clone());
+        self.zksync_compile_with_solc_version(&solc, sources)
+    }
 }
 
 pub struct ProjectBuilder<T: ArtifactOutput = ConfigurableArtifacts, C: Compiler = Solc> {
@@ -580,6 +660,11 @@ pub struct ProjectBuilder<T: ArtifactOutput = ConfigurableArtifacts, C: Compiler
     /// The minimum severity level that is treated as a compiler error
     compiler_severity_filter: Severity,
     solc_jobs: Option<usize>,
+
+    /// Where to find zksolc
+    zksync_zksolc: Option<ZkSolc>,
+    zksync_zksolc_config: Option<ZkSolcConfig>,
+    zksync_avoid_contracts: Option<Vec<globset::GlobMatcher>>,
 }
 
 impl<T: ArtifactOutput, C: Compiler> ProjectBuilder<T, C> {
@@ -598,6 +683,10 @@ impl<T: ArtifactOutput, C: Compiler> ProjectBuilder<T, C> {
             compiler_severity_filter: Severity::Error,
             solc_jobs: None,
             settings: None,
+
+            zksync_zksolc: None,
+            zksync_zksolc_config: None,
+            zksync_avoid_contracts: None,
         }
     }
 
@@ -727,6 +816,9 @@ impl<T: ArtifactOutput, C: Compiler> ProjectBuilder<T, C> {
             slash_paths,
             ignored_file_paths,
             settings,
+            zksync_zksolc,
+            zksync_zksolc_config,
+            zksync_avoid_contracts,
             ..
         } = self;
         ProjectBuilder {
@@ -742,6 +834,9 @@ impl<T: ArtifactOutput, C: Compiler> ProjectBuilder<T, C> {
             solc_jobs,
             build_info,
             settings,
+            zksync_zksolc,
+            zksync_zksolc_config,
+            zksync_avoid_contracts,
         }
     }
 
@@ -759,6 +854,9 @@ impl<T: ArtifactOutput, C: Compiler> ProjectBuilder<T, C> {
             build_info,
             slash_paths,
             settings,
+            zksync_zksolc,
+            zksync_zksolc_config,
+            zksync_avoid_contracts,
         } = self;
 
         let mut paths = paths.map(Ok).unwrap_or_else(ProjectPathsConfig::current_hardhat)?;
@@ -768,6 +866,9 @@ impl<T: ArtifactOutput, C: Compiler> ProjectBuilder<T, C> {
             paths.slash_paths();
         }
 
+        let zksync_zksolc = zksync_zksolc.unwrap_or_default();
+        let zksync_zksolc_config = zksync_zksolc_config.unwrap_or_default();
+        let zksync_artifacts = ZkArtifactOutput();
         Ok(Project {
             compiler_config,
             paths,
@@ -784,6 +885,10 @@ impl<T: ArtifactOutput, C: Compiler> ProjectBuilder<T, C> {
             offline,
             slash_paths,
             settings: settings.unwrap_or_default(),
+            zksync_zksolc,
+            zksync_zksolc_config,
+            zksync_artifacts,
+            zksync_avoid_contracts,
         })
     }
 }
