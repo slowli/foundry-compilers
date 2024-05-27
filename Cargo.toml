@@ -59,6 +59,10 @@ svm-builds = { package = "svm-rs-builds", version = "0.3", default-features = fa
 sha2 = { version = "0.10", default-features = false, optional = true }
 itertools = "0.12"
 
+# zksync
+reqwest = { version = "0.11", default-features = false, optional = true }
+globset = "0.4"
+
 [dev-dependencies]
 alloy-primitives = { version = "0.6", features = ["serde", "rand"] }
 criterion = { version = "0.5", features = ["async_tokio"] }
@@ -94,7 +98,7 @@ default = ["rustls"]
 full = ["async", "svm-solc"]
 
 # Adds extra `async` methods using `tokio` to some types.
-async = ["dep:futures-util", "dep:tokio", "tokio/fs", "tokio/process", "tokio/io-util"]
+async = ["dep:futures-util", "dep:tokio", "tokio/fs", "tokio/process", "tokio/io-util", "dep:reqwest"]
 # Enables `svm` to auto-detect and manage `solc` builds.
 svm-solc = ["dep:svm", "dep:svm-builds", "dep:sha2", "dep:tokio"]
 # Utilities for creating and testing project workspaces.
