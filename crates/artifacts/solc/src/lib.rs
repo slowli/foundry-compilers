@@ -1766,7 +1766,7 @@ pub struct StorageLayout {
 }
 
 impl StorageLayout {
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.storage.is_empty() && self.types.is_empty()
     }
 }
