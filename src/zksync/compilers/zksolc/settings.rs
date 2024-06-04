@@ -54,6 +54,8 @@ pub struct ZkSolcSettings {
     /// A flag indicating whether to forcibly switch to the EVM legacy assembly pipeline.
     #[serde(default)]
     pub force_evmla: bool,
+    /// The path to the solc compiler to use along zksolc.
+    pub solc: Option<std::path::PathBuf>,
 }
 
 impl ZkSolcSettings {
@@ -105,6 +107,7 @@ impl Default for ZkSolcSettings {
             system_mode: false,
             force_evmla: false,
             detect_missing_libraries: false,
+            solc: None,
         }
     }
 }
