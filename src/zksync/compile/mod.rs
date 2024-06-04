@@ -142,8 +142,12 @@ impl ZkSolc {
         } else {
             // TODO: respect offline settings although it requires moving where we
             // check and get zksolc solc pathj
-            let installed_solc_path = Self::solc_blocking_install(&solc_version_without_metadata)?;
-            zksolc.solc = Some(installed_solc_path);
+            #[cfg(feature = "async")]
+            {
+                let installed_solc_path =
+                    Self::solc_blocking_install(&solc_version_without_metadata)?;
+                zksolc.solc = Some(installed_solc_path);
+            }
         }
 
         Ok(zksolc)
