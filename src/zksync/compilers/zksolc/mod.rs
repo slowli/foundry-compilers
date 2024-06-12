@@ -213,10 +213,13 @@ impl ZkSolc {
             cmd.current_dir(base_path);
         }
 
-        if let Some(solc) = &input.settings.solc {
-            cmd.arg("--solc").arg(solc);
-        } else if let Some(solc) = &self.solc {
-            cmd.arg("--solc").arg(solc);
+        // don't pass solc argument in yul mode (avoid verification)
+        if !input.is_yul() {
+            if let Some(solc) = &input.settings.solc {
+                cmd.arg("--solc").arg(solc);
+            } else if let Some(solc) = &self.solc {
+                cmd.arg("--solc").arg(solc);
+            }
         }
 
         if input.settings.system_mode {
