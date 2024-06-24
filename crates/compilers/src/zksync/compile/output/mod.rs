@@ -1,20 +1,25 @@
 use crate::{
     artifact_output::{ArtifactId, Artifacts},
     artifacts::error::Severity,
+    buildinfo::RawBuildInfo,
     compile::output::{
         info::ContractInfoRef,
         sources::{VersionedSourceFile, VersionedSourceFiles},
-        ErrorFilter,
     },
+    output::Builds,
     zksync::{
         artifact_output::{artifacts_artifacts, contract_name, zk::ZkContractArtifact},
-        artifacts::{
-            contract::{CompactContractRef, Contract},
-            error::Error,
-            CompilerOutput,
-        },
         compile::output::contracts::{VersionedContract, VersionedContracts},
     },
+};
+use foundry_compilers_artifacts::ErrorFilter;
+use foundry_compilers_artifacts::{
+    zksolc::{
+        contract::{CompactContractRef, Contract},
+        error::Error,
+        CompilerOutput,
+    },
+    SolcLanguage,
 };
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -29,17 +34,19 @@ pub mod contracts;
 #[derive(Clone)]
 pub struct ProjectCompileOutput {
     /// contains the aggregated `CompilerOutput`
-    pub(crate) compiler_output: AggregatedCompilerOutput,
+    pub compiler_output: AggregatedCompilerOutput,
     /// all artifact files from `output` that were freshly compiled and written
-    pub(crate) compiled_artifacts: Artifacts<ZkContractArtifact>,
+    pub compiled_artifacts: Artifacts<ZkContractArtifact>,
     /// All artifacts that were read from cache
-    pub(crate) cached_artifacts: Artifacts<ZkContractArtifact>,
+    pub cached_artifacts: Artifacts<ZkContractArtifact>,
     /// errors that should be omitted
-    pub(crate) ignored_error_codes: Vec<u64>,
+    pub ignored_error_codes: Vec<u64>,
     /// paths that should be omitted
-    pub(crate) ignored_file_paths: Vec<PathBuf>,
+    pub ignored_file_paths: Vec<PathBuf>,
     /// set minimum level of severity that is treated as an error
-    pub(crate) compiler_severity_filter: Severity,
+    pub compiler_severity_filter: Severity,
+    /// all build infos that were just compiled
+    pub builds: Builds<SolcLanguage>,
 }
 
 impl ProjectCompileOutput {
@@ -190,10 +197,8 @@ pub struct AggregatedCompilerOutput {
     pub sources: VersionedSourceFiles,
     /// All compiled contracts combined with the solc version used to compile them
     pub contracts: VersionedContracts,
-    // All the `BuildInfo`s of solc invocations.
-    //pub build_infos: BTreeMap<Version, RawBuildInfo>,
-    /// Whether some compilation triggered recompiling with --detect-missing-libraries setting
-    pub recompiled_with_detect_missing_libraries: bool,
+    // All the `BuildInfo`s of zksolc invocations.
+    pub build_infos: Vec<RawBuildInfo<SolcLanguage>>,
 }
 
 impl AggregatedCompilerOutput {
@@ -277,30 +282,37 @@ impl AggregatedCompilerOutput {
         self.contracts.is_empty() && self.errors.is_empty()
     }
 
-    pub fn extend_all<I>(&mut self, out: I)
-    where
-        I: IntoIterator<Item = (Version, CompilerOutput)>,
-    {
-        for (v, o) in out {
-            self.extend(v, o)
-        }
-    }
-
     /// adds a new `CompilerOutput` to the aggregated output
-    pub fn extend(&mut self, version: Version, output: CompilerOutput) {
+    pub fn extend(
+        &mut self,
+        version: Version,
+        build_info: RawBuildInfo<SolcLanguage>,
+        output: CompilerOutput,
+    ) {
+        let build_id = build_info.id.clone();
+        self.build_infos.push(build_info);
+
         let CompilerOutput { errors, sources, contracts, .. } = output;
         self.errors.extend(errors);
 
         for (path, source_file) in sources {
             let sources = self.sources.as_mut().entry(path).or_default();
-            sources.push(VersionedSourceFile { source_file, version: version.clone() });
+            sources.push(VersionedSourceFile {
+                source_file,
+                version: version.clone(),
+                build_id: build_id.clone(),
+            });
         }
 
         for (file_name, new_contracts) in contracts {
             let contracts = self.contracts.as_mut().entry(file_name).or_default();
             for (contract_name, contract) in new_contracts {
                 let versioned = contracts.entry(contract_name).or_default();
-                versioned.push(VersionedContract { contract, version: version.clone() });
+                versioned.push(VersionedContract {
+                    contract,
+                    version: version.clone(),
+                    build_id: build_id.clone(),
+                });
             }
         }
     }

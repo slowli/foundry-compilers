@@ -1,8 +1,10 @@
 use crate::{
     artifacts::{serde_helpers, EvmVersion, Libraries},
     compilers::CompilerSettings,
-    remappings::Remapping,
-    zksync::artifacts::output_selection::OutputSelection as ZkOutputSelection,
+    OutputSelection,
+};
+use foundry_compilers_artifacts::{
+    remappings::Remapping, zksolc::output_selection::OutputSelection as ZkOutputSelection,
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::Path, str::FromStr};
@@ -113,8 +115,9 @@ impl Default for ZkSolcSettings {
 }
 
 impl CompilerSettings for ZkSolcSettings {
-    fn output_selection_mut(&mut self) -> &mut crate::OutputSelection {
-        panic!("ouptut_selection_mut not implemented for zksolc")
+    fn update_output_selection(&mut self, _f: impl FnOnce(&mut OutputSelection) + Copy) {
+        // TODO: see how to support this, noop for now
+        //f(&mut self.output_selection)
     }
 
     fn can_use_cached(&self, other: &Self) -> bool {
@@ -255,8 +258,8 @@ impl FromStr for BytecodeHash {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "none" => Ok(BytecodeHash::None),
-            "keccak256" => Ok(BytecodeHash::Keccak256),
+            "none" => Ok(Self::None),
+            "keccak256" => Ok(Self::Keccak256),
             s => Err(format!("Unknown bytecode hash: {s}")),
         }
     }
@@ -265,8 +268,8 @@ impl FromStr for BytecodeHash {
 impl fmt::Display for BytecodeHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
-            BytecodeHash::Keccak256 => "keccak256",
-            BytecodeHash::None => "none",
+            Self::Keccak256 => "keccak256",
+            Self::None => "none",
         };
         f.write_str(s)
     }

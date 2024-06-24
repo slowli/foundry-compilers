@@ -1,4 +1,4 @@
-use crate::artifacts::{FileToContractsMap, SourceFile, SourceFiles};
+use foundry_compilers_artifacts_solc::{FileToContractsMap, SourceFile, SourceFiles};
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -66,7 +66,7 @@ impl CompilerOutput {
         self.sources.retain(|f, _| files.contains(&f.to_string_lossy().to_lowercase()));
     }
 
-    pub fn merge(&mut self, other: CompilerOutput) {
+    pub fn merge(&mut self, other: Self) {
         self.errors.extend(other.errors);
         self.contracts.extend(other.contracts);
         self.sources.extend(other.sources);
