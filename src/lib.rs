@@ -575,7 +575,7 @@ impl<T: ArtifactOutput> Project<T> {
     }
 
     /// Returns standard-json-input to compile the target contract
-    pub fn zk_standard_json_input(
+    pub fn zksync_standard_json_input(
         &self,
         target: impl AsRef<Path>,
     ) -> Result<ZkStandardJsonCompilerInput> {
