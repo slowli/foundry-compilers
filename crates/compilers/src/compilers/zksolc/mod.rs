@@ -462,7 +462,7 @@ fn version_from_output(output: Output) -> Result<Version> {
         Ok(Version::from_str(
             version
                 .split_whitespace()
-                .nth(3)
+                .nth(4)
                 .ok_or_else(|| SolcError::msg("Unable to retrieve version from zksolc output"))?
                 .trim_start_matches('v'),
         )?)
