@@ -287,6 +287,8 @@ impl ZkSolc {
     // TODO: Maybe this (and the whole module) goes behind a zksync feature installed
     #[cfg(feature = "async")]
     pub fn blocking_install(version: &Version) -> Result<Self> {
+        #[cfg(test)]
+        take_solc_installer_lock!(_lock);
         use crate::utils::RuntimeOrHandle;
 
         trace!("blocking installing solc version \"{}\"", version);
