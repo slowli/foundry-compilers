@@ -303,6 +303,22 @@ impl ZkSolc {
 
             let compiler_path = Self::compiler_path(version)?;
 
+            let lock_file_dir = Self::compilers_dir()?;
+            std::fs::create_dir_all(&lock_file_dir).map_err(|e| {
+                SolcError::msg(format!("Failed to create directory '{lock_file_dir:?}': {e}"))
+            })?;
+            let lock_file_path = lock_file_dir.join(format!(".download-lock"));
+            let lock_file = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(lock_file_path)
+                .map_err(|e| SolcError::msg(format!("Failed to create lock file: {e}")))?;
+            let mut lock = fd_lock::RwLock::new(lock_file);
+            let write = lock.write().map_err(|e| SolcError::msg(format!("Failed to acquire write lock: {e}")))?;
+
+
             let client = reqwest::Client::new();
             let response = client
                 .get(full_download_url)
@@ -333,6 +349,8 @@ impl ZkSolc {
                 set_permissions(&compiler_path, PermissionsExt::from_mode(0o755)).await.map_err(
                     |e| SolcError::msg(format!("Failed to set zksync compiler permissions: {e}")),
                 )?;
+
+                drop(write);
             } else {
                 return Err(SolcError::msg(format!(
                     "Failed to download file: status code {}",
