@@ -318,6 +318,10 @@ impl ZkSolc {
             let mut lock = fd_lock::RwLock::new(lock_file);
             let write = lock.write().map_err(|e| SolcError::msg(format!("Failed to acquire write lock: {e}")))?;
 
+            // return if some other process has already downloaded the compiler
+            if compiler_path.exists() {
+                return Ok(compiler_path);
+            }
 
             let client = reqwest::Client::new();
             let response = client
