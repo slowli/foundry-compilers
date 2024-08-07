@@ -314,6 +314,7 @@ impl ZkSolc {
             let compiler_path = Self::compiler_path(version)?;
 
             let lock_file_path = Self::compilers_dir()?.join(format!(".download-lock-{version}"));
+            println!("--> {:?} compiler path lockfile {lock_file_path:?}", std::time::SystemTime::now());
             let lock_file = std::fs::OpenOptions::new()
                 .read(true)
                 .write(true)
