@@ -253,7 +253,12 @@ impl ZkSolc {
         debug!(?cmd, "getting ZkSolc version");
         println!("--> {:?} version cmd", std::time::SystemTime::now());
         let meta = std::fs::metadata(&self.zksolc).unwrap();
-        println!("--> {:?} compiler file: {:?} {:?}", std::time::SystemTime::now(), meta.len(), meta.permissions());
+        println!(
+            "--> {:?} compiler file: {:?} {:?}",
+            std::time::SystemTime::now(),
+            meta.len(),
+            meta.permissions()
+        );
         let output = cmd.output().map_err(self.map_io_err())?;
         println!("--> {:?} version got", std::time::SystemTime::now());
         trace!(?output);
@@ -308,8 +313,29 @@ impl ZkSolc {
 
             let compiler_path = Self::compiler_path(version)?;
 
+            let lock_file_path = Self::compilers_dir()?.join(format!(".download-lock-{version}"));
+            let lock_file = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(lock_file_path)
+                .map_err(|e| SolcError::msg(format!("Failed to create lock file: {e}")))?;
+            let mut lock = fd_lock::RwLock::new(lock_file);
             println!("--> {:?} compiler path {compiler_path:?}", std::time::SystemTime::now());
             println!("--> {:?} compiler path exists {:?}", std::time::SystemTime::now(), compiler_path.exists());
+            println!("--> {:?} compiler get lock", std::time::SystemTime::now());
+            let write = lock.write().map_err(|e| SolcError::msg(format!("Failed to acquire write lock file: {e}")))?;
+            println!("--> {:?} compiler got lock", std::time::SystemTime::now());
+            println!("--> {:?} compiler path exists {:?}", std::time::SystemTime::now(), compiler_path.exists());
+
+            // return if some other process has already downloaded the compiler
+            if compiler_path.exists() {
+                println!("--> {:?} compiler path exists : return early", std::time::SystemTime::now());
+                return Ok(compiler_path);
+            }
+
+            
 
             let client = reqwest::Client::new();
             let response = client
@@ -348,6 +374,7 @@ impl ZkSolc {
                 println!("--> {:?} compiler set perm: done", std::time::SystemTime::now());
                 let meta = std::fs::metadata(&compiler_path).unwrap();
                 println!("--> {:?} compiler file: {:?} {:?}", std::time::SystemTime::now(), meta.len(), meta.permissions());
+                drop(write);
             } else {
                 return Err(SolcError::msg(format!(
                     "Failed to download file: status code {}",
