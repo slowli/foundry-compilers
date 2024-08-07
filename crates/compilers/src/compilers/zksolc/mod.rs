@@ -313,7 +313,9 @@ impl ZkSolc {
 
             let compiler_path = Self::compiler_path(version)?;
 
-            let lock_file_path = Self::compilers_dir()?.join(format!(".download-lock-{version}"));
+            let lock_file_dir = Self::compilers_dir()?;
+            std::fs::create_dir_all(lock_file_dir).map_err(|e| SolcError::msg(format!("Failed to create directory '{lock_file_dir}': {e}")));
+            let lock_file_path = lock_file_dir.join(format!(".download-lock-{version}"));
             println!("--> {:?} compiler path lockfile {lock_file_path:?}", std::time::SystemTime::now());
             let lock_file = std::fs::OpenOptions::new()
                 .read(true)
