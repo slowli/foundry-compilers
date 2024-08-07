@@ -15,7 +15,7 @@ use std::{
 #[cfg(feature = "async")]
 use std::{
     fs::{self, create_dir_all, set_permissions, File},
-    io::write,
+    io::Write,
 };
 
 #[cfg(target_family = "unix")]
