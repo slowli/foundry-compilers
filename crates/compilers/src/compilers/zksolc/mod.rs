@@ -247,10 +247,13 @@ impl ZkSolc {
     /// Invokes `zksolc --version` and parses the output as a SemVer [`Version`].
     #[instrument(level = "debug", skip_all)]
     pub fn version(&self) -> Result<Version> {
+        println!("--> {:?} version req", std::time::SystemTime::now());
         let mut cmd = Command::new(&self.zksolc);
         cmd.arg("--version").stdin(Stdio::piped()).stderr(Stdio::piped()).stdout(Stdio::piped());
         debug!(?cmd, "getting ZkSolc version");
+        println!("--> {:?} version cmd", std::time::SystemTime::now());
         let output = cmd.output().map_err(self.map_io_err())?;
+        println!("--> {:?} version got", std::time::SystemTime::now());
         trace!(?output);
         let version = version_from_output(output)?;
         debug!(%version);
@@ -303,6 +306,9 @@ impl ZkSolc {
 
             let compiler_path = Self::compiler_path(version)?;
 
+            println!("--> {:?} compiler path {compiler_path:?}", std::time::SystemTime::now());
+            println!("--> {:?} compiler path exists {:?}", std::time::SystemTime::now(), compiler_path.exists());
+
             let client = reqwest::Client::new();
             let response = client
                 .get(full_download_url)
@@ -326,13 +332,18 @@ impl ZkSolc {
                     .await
                     .map_err(|e| SolcError::msg(format!("failed to download file: {e}")))?;
 
+                println!("--> {:?} compiler downloaded", std::time::SystemTime::now());
+                
                 copy(&mut content.as_ref(), &mut output_file).await.map_err(|e| {
                     SolcError::msg(format!("Failed to write the downloaded file: {e}"))
                 })?;
+                println!("--> {:?} compiler written", std::time::SystemTime::now());
 
+                println!("--> {:?} compiler set perm: start", std::time::SystemTime::now());
                 set_permissions(&compiler_path, PermissionsExt::from_mode(0o755)).await.map_err(
                     |e| SolcError::msg(format!("Failed to set zksync compiler permissions: {e}")),
                 )?;
+                println!("--> {:?} compiler set perm: done", std::time::SystemTime::now());
             } else {
                 return Err(SolcError::msg(format!(
                     "Failed to download file: status code {}",
