@@ -400,7 +400,7 @@ fn compiler_blocking_install(
     label: &str,
 ) -> Result<PathBuf> {
     use foundry_compilers_core::utils::RuntimeOrHandle;
-    println!("blocking installing {label}");
+    warn!("blocking installing {label}");
     //trace!("blocking installing {label}");
     // An async block is used because the underlying `reqwest::blocking::Client` does not behave
     // well inside of a Tokio runtime. See: https://github.com/seanmonstar/reqwest/issues/1017
@@ -417,21 +417,21 @@ fn compiler_blocking_install(
                 .bytes()
                 .await
                 .map_err(|e| SolcError::msg(format!("failed to download {label} file: {e}")))?;
-            println!("downloaded {label}");
+            warn!("downloaded {label}");
             //trace!("downloaded {label}");
 
             // lock file to indicate that installation of this compiler version will be in progress.
             // wait until lock file is released, possibly by another parallel thread trying to install the
             // same compiler version.
-            println!("try to get lock for {label}");
+            warn!("try to get lock for {label}");
             let _lock = try_lock_file(lock_path)?;
-            println!("got lock for {label}");
+            warn!("got lock for {label}");
 
             // Only write to file if it is not there. The check is doneafter adquiring the lock
             // to ensure the thread remains blocked until the required compiler is
             // fully installed
             if !compiler_path.exists() {
-                println!("creating binary for {label}");
+                warn!("creating binary for {label}");
                 //trace!("creating binary for {label}");
                 let mut output_file = File::create(&compiler_path).map_err(|e| {
                     SolcError::msg(format!("Failed to create output {label} file: {e}"))
@@ -445,7 +445,7 @@ fn compiler_blocking_install(
                     SolcError::msg(format!("Failed to set {label} permissions: {e}"))
                 })?;
             } else {
-                println!("found binary for {label}");
+                warn!("found binary for {label}");
             }
         } else {
             return Err(SolcError::msg(format!(
@@ -453,7 +453,7 @@ fn compiler_blocking_install(
                 response.status()
             )));
         }
-        println!("{label} instalation completed");
+        warn!("{label} instalation completed");
         Ok(compiler_path)
     })
 }
