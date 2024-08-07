@@ -290,7 +290,7 @@ impl ZkSolc {
     // TODO: Maybe this (and the whole module) goes behind a zksync feature installed
     #[cfg(feature = "async")]
     pub fn blocking_install(version: &Version) -> Result<Self> {
-        use crate::utils::RuntimeOrHandle;
+        use foundry_compilers_core::utils::RuntimeOrHandle;
         println!("block install started");
 
         trace!("blocking installing solc version \"{}\"", version);
@@ -327,7 +327,7 @@ impl ZkSolc {
                     .map_err(|e| SolcError::msg(format!("failed to download file: {e}")))?;
 
                 // lock file to indicate that installation of this compiler version will be in progress.
-                let lock_path = lock_file_path(version);
+                let lock_path = lock_file_path("zksolc", &version.to_string());
                 // wait until lock file is released, possibly by another parallel thread trying to install the
                 // same compiler version.
                 let _lock = try_lock_file(lock_path)?;
@@ -396,14 +396,21 @@ impl ZkSolc {
                         SolcError::msg(format!("Could not create compilers path: {e}"))
                     })?;
                 }
-                let mut output_file = File::create(&solc_path)
-                    .await
-                    .map_err(|e| SolcError::msg(format!("Failed to create output file: {e}")))?;
 
                 let content = response
                     .bytes()
                     .await
                     .map_err(|e| SolcError::msg(format!("failed to download file: {e}")))?;
+
+                // lock file to indicate that installation of this compiler version will be in progress.
+                let lock_path = lock_file_path("solc", version_str);
+                // wait until lock file is released, possibly by another parallel thread trying to install the
+                // same compiler version.
+                let _lock = try_lock_file(lock_path)?;
+
+                let mut output_file = File::create(&solc_path)
+                    .await
+                    .map_err(|e| SolcError::msg(format!("Failed to create output file: {e}")))?;
 
                 copy(&mut content.as_ref(), &mut output_file).await.map_err(|e| {
                     SolcError::msg(format!("Failed to write the downloaded file: {e}"))
@@ -511,10 +518,10 @@ impl Drop for LockFile {
 }
 
 /// Returns the lockfile to use for a specific file
-fn lock_file_path(version: &Version) -> PathBuf {
+fn lock_file_path(compiler: &str, version: &str) -> PathBuf {
     ZkSolc::compilers_dir()
         .expect("could not detect zksolc compilers directory")
-        .join(format!(".lock-zksolc-{version}"))
+        .join(format!(".lock-{compiler}-{version}"))
 }
 
 #[cfg(test)]
