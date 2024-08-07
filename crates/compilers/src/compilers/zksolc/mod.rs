@@ -252,6 +252,8 @@ impl ZkSolc {
         cmd.arg("--version").stdin(Stdio::piped()).stderr(Stdio::piped()).stdout(Stdio::piped());
         debug!(?cmd, "getting ZkSolc version");
         println!("--> {:?} version cmd", std::time::SystemTime::now());
+        let meta = std::fs::metadata(&self.zksolc).unwrap();
+        println!("--> {:?} compiler file: {:?} {:?}", std::time::SystemTime::now(), meta.len(), meta.permissions());
         let output = cmd.output().map_err(self.map_io_err())?;
         println!("--> {:?} version got", std::time::SystemTime::now());
         trace!(?output);
@@ -344,6 +346,8 @@ impl ZkSolc {
                     |e| SolcError::msg(format!("Failed to set zksync compiler permissions: {e}")),
                 )?;
                 println!("--> {:?} compiler set perm: done", std::time::SystemTime::now());
+                let meta = std::fs::metadata(&compiler_path).unwrap();
+                println!("--> {:?} compiler file: {:?} {:?}", std::time::SystemTime::now(), meta.len(), meta.permissions());
             } else {
                 return Err(SolcError::msg(format!(
                     "Failed to download file: status code {}",
