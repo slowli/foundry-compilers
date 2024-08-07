@@ -40,6 +40,7 @@ derivative = "2.2"
 home = "0.5"
 dirs = "5.0"
 itertools = "0.13"
+fd-lock = "4.0.2"
 
 # project-util
 tempfile = { version = "3.9", optional = true }

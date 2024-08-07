@@ -7,14 +7,19 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
-    fs::{self, create_dir_all, set_permissions, File},
-    io::Write,
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
     str::FromStr,
 };
 
+#[cfg(feature = "async")]
+use std::{
+    fs::{self, create_dir_all, set_permissions, File},
+    io::write,
+};
+
 #[cfg(target_family = "unix")]
+#[cfg(feature = "async")]
 use std::os::unix::fs::PermissionsExt;
 
 pub mod input;
@@ -393,6 +398,7 @@ impl<T: Into<PathBuf>> From<T> for ZkSolc {
     }
 }
 
+#[cfg(feature = "async")]
 fn compiler_blocking_install(
     compiler_path: PathBuf,
     lock_path: PathBuf,
@@ -458,6 +464,7 @@ fn compiler_blocking_install(
 }
 
 /// Creates the file and locks it exclusively, this will block if the file is currently locked
+#[cfg(feature = "async")]
 fn try_lock_file(lock_path: PathBuf) -> Result<LockFile> {
     use fs4::FileExt;
     let _lock_file = std::fs::OpenOptions::new()
@@ -472,11 +479,13 @@ fn try_lock_file(lock_path: PathBuf) -> Result<LockFile> {
 }
 
 /// Represents a lockfile that's removed once dropped
+#[cfg(feature = "async")]
 struct LockFile {
     _lock_file: File,
     lock_path: PathBuf,
 }
 
+#[cfg(feature = "async")]
 impl Drop for LockFile {
     fn drop(&mut self) {
         let _ = fs::remove_file(&self.lock_path);
@@ -484,6 +493,7 @@ impl Drop for LockFile {
 }
 
 /// Returns the lockfile to use for a specific file
+#[cfg(feature = "async")]
 fn lock_file_path(compiler: &str, version: &str) -> PathBuf {
     ZkSolc::compilers_dir()
         .expect("could not detect zksolc compilers directory")
