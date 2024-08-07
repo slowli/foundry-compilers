@@ -7,23 +7,19 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
-    fs,
+    fs::{self, create_dir_all, set_permissions, File},
+    io::Write,
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
     str::FromStr,
 };
 
+#[cfg(target_family = "unix")]
+use std::os::unix::fs::PermissionsExt;
+
 pub mod input;
 pub mod settings;
 pub use settings::ZkSolcSettings;
-
-#[cfg(feature = "async")]
-use std::os::unix::prelude::PermissionsExt;
-#[cfg(feature = "async")]
-use tokio::{
-    fs::{create_dir_all, set_permissions, File},
-    io::copy,
-};
 
 pub const ZKSOLC: &str = "zksolc";
 pub const ZKSYNC_SOLC_RELEASE: Version = Version::new(1, 0, 1);
@@ -127,7 +123,7 @@ impl ZkSolc {
         let mut zksolc = self.clone();
         // TODO: maybe we can just override the input
         if input.input.settings.solc.is_some() {
-            zksolc.solc = input.input.settings.solc.clone();
+            zksolc.solc.clone_from(&input.input.settings.solc);
         } else {
             let solc_version_without_metadata = format!(
                 "{}.{}.{}",
@@ -293,7 +289,7 @@ impl ZkSolc {
         use foundry_compilers_core::utils::RuntimeOrHandle;
         println!("block install started");
 
-        trace!("blocking installing solc version \"{}\"", version);
+        trace!("blocking installing zksolc version \"{}\"", version);
         // TODO: Evaluate report support
         //crate::report::solc_installation_start(version);
         // An async block is used because the underlying `reqwest::blocking::Client` does not behave
@@ -317,7 +313,7 @@ impl ZkSolc {
             if response.status().is_success() {
                 let compilers_dir = Self::compilers_dir()?;
                 if !compilers_dir.exists() {
-                    create_dir_all(compilers_dir).await.map_err(|e| {
+                    create_dir_all(compilers_dir).map_err(|e| {
                         SolcError::msg(format!("Could not create compilers path: {e}"))
                     })?;
                 }
@@ -333,14 +329,13 @@ impl ZkSolc {
                 let _lock = try_lock_file(lock_path)?;
 
                 let mut output_file = File::create(&compiler_path)
-                    .await
                     .map_err(|e| SolcError::msg(format!("Failed to create output file: {e}")))?;
 
-                copy(&mut content.as_ref(), &mut output_file).await.map_err(|e| {
+                output_file.write_all(&content).map_err(|e| {
                     SolcError::msg(format!("Failed to write the downloaded file: {e}"))
                 })?;
 
-                set_permissions(&compiler_path, PermissionsExt::from_mode(0o755)).await.map_err(
+                set_permissions(&compiler_path, PermissionsExt::from_mode(0o755)).map_err(
                     |e| SolcError::msg(format!("Failed to set zksync compiler permissions: {e}")),
                 )?;
             } else {
@@ -392,7 +387,7 @@ impl ZkSolc {
             if response.status().is_success() {
                 let compilers_dir = Self::compilers_dir()?;
                 if !compilers_dir.exists() {
-                    create_dir_all(compilers_dir).await.map_err(|e| {
+                    create_dir_all(compilers_dir).map_err(|e| {
                         SolcError::msg(format!("Could not create compilers path: {e}"))
                     })?;
                 }
@@ -409,14 +404,13 @@ impl ZkSolc {
                 let _lock = try_lock_file(lock_path)?;
 
                 let mut output_file = File::create(&solc_path)
-                    .await
                     .map_err(|e| SolcError::msg(format!("Failed to create output file: {e}")))?;
 
-                copy(&mut content.as_ref(), &mut output_file).await.map_err(|e| {
+                output_file.write_all(&content).map_err(|e| {
                     SolcError::msg(format!("Failed to write the downloaded file: {e}"))
                 })?;
 
-                set_permissions(&solc_path, PermissionsExt::from_mode(0o755)).await.map_err(
+                set_permissions(&solc_path, PermissionsExt::from_mode(0o755)).map_err(
                     |e| SolcError::msg(format!("Failed to set zksync compiler permissions: {e}")),
                 )?;
             } else {
@@ -493,7 +487,7 @@ impl<T: Into<PathBuf>> From<T> for ZkSolc {
 fn try_lock_file(lock_path: PathBuf) -> Result<LockFile> {
     use fs4::FileExt;
     println!("Trying to take the lock");
-    let _lock_file = fs::OpenOptions::new()
+    let _lock_file = std::fs::OpenOptions::new()
         .create(true)
         .truncate(true)
         .read(true)
@@ -507,7 +501,7 @@ fn try_lock_file(lock_path: PathBuf) -> Result<LockFile> {
 
 /// Represents a lockfile that's removed once dropped
 struct LockFile {
-    _lock_file: fs::File,
+    _lock_file: File,
     lock_path: PathBuf,
 }
 
