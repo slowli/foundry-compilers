@@ -328,16 +328,20 @@ impl ZkSolc {
                 // same compiler version.
                 let _lock = try_lock_file(lock_path)?;
 
-                let mut output_file = File::create(&compiler_path)
-                    .map_err(|e| SolcError::msg(format!("Failed to create output file: {e}")))?;
+                // Only write to file if it is not there
+                if !compiler_path.exists() {
+                    let mut output_file = File::create(&compiler_path)
+                        .map_err(|e| SolcError::msg(format!("Failed to create output file: {e}")))?;
 
-                output_file.write_all(&content).map_err(|e| {
-                    SolcError::msg(format!("Failed to write the downloaded file: {e}"))
-                })?;
+                    output_file.write_all(&content).map_err(|e| {
+                        SolcError::msg(format!("Failed to write the downloaded file: {e}"))
+                    })?;
 
-                set_permissions(&compiler_path, PermissionsExt::from_mode(0o755)).map_err(
-                    |e| SolcError::msg(format!("Failed to set zksync compiler permissions: {e}")),
-                )?;
+                    set_permissions(&compiler_path, PermissionsExt::from_mode(0o755)).map_err(
+                        |e| SolcError::msg(format!("Failed to set zksync compiler permissions: {e}")),
+                    )?;
+                }
+
             } else {
                 return Err(SolcError::msg(format!(
                     "Failed to download file: status code {}",
@@ -403,16 +407,19 @@ impl ZkSolc {
                 // same compiler version.
                 let _lock = try_lock_file(lock_path)?;
 
-                let mut output_file = File::create(&solc_path)
-                    .map_err(|e| SolcError::msg(format!("Failed to create output file: {e}")))?;
+                // Only write to file if it is not there
+                if !solc_path.exists() {
+                    let mut output_file = File::create(&solc_path)
+                        .map_err(|e| SolcError::msg(format!("Failed to create output file: {e}")))?;
 
-                output_file.write_all(&content).map_err(|e| {
-                    SolcError::msg(format!("Failed to write the downloaded file: {e}"))
-                })?;
+                    output_file.write_all(&content).map_err(|e| {
+                        SolcError::msg(format!("Failed to write the downloaded file: {e}"))
+                    })?;
 
-                set_permissions(&solc_path, PermissionsExt::from_mode(0o755)).map_err(
-                    |e| SolcError::msg(format!("Failed to set zksync compiler permissions: {e}")),
-                )?;
+                    set_permissions(&solc_path, PermissionsExt::from_mode(0o755)).map_err(
+                        |e| SolcError::msg(format!("Failed to set zksync compiler permissions: {e}")),
+                    )?;
+                }
             } else {
                 return Err(SolcError::msg(format!(
                     "Failed to download file: status code {}",
