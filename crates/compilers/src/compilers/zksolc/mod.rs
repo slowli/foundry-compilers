@@ -7,6 +7,7 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
+    fs,
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
     str::FromStr,
@@ -240,6 +241,7 @@ impl ZkSolc {
     /// Invokes `zksolc --version` and parses the output as a SemVer [`Version`], stripping the
     /// pre-release and build metadata.
     pub fn version_short(&self) -> Result<Version> {
+        println!("version short");
         let version = self.version()?;
         Ok(Version::new(version.major, version.minor, version.patch))
     }
@@ -247,6 +249,7 @@ impl ZkSolc {
     /// Invokes `zksolc --version` and parses the output as a SemVer [`Version`].
     #[instrument(level = "debug", skip_all)]
     pub fn version(&self) -> Result<Version> {
+        println!("version");
         let mut cmd = Command::new(&self.zksolc);
         cmd.arg("--version").stdin(Stdio::piped()).stderr(Stdio::piped()).stdout(Stdio::piped());
         debug!(?cmd, "getting ZkSolc version");
@@ -287,9 +290,8 @@ impl ZkSolc {
     // TODO: Maybe this (and the whole module) goes behind a zksync feature installed
     #[cfg(feature = "async")]
     pub fn blocking_install(version: &Version) -> Result<Self> {
-        #[cfg(test)]
-        take_solc_installer_lock!(_lock);
         use crate::utils::RuntimeOrHandle;
+        println!("block install started");
 
         trace!("blocking installing solc version \"{}\"", version);
         // TODO: Evaluate report support
@@ -319,14 +321,20 @@ impl ZkSolc {
                         SolcError::msg(format!("Could not create compilers path: {e}"))
                     })?;
                 }
-                let mut output_file = File::create(&compiler_path)
-                    .await
-                    .map_err(|e| SolcError::msg(format!("Failed to create output file: {e}")))?;
-
                 let content = response
                     .bytes()
                     .await
                     .map_err(|e| SolcError::msg(format!("failed to download file: {e}")))?;
+
+                // lock file to indicate that installation of this compiler version will be in progress.
+                let lock_path = lock_file_path(version);
+                // wait until lock file is released, possibly by another parallel thread trying to install the
+                // same compiler version.
+                let _lock = try_lock_file(lock_path)?;
+
+                let mut output_file = File::create(&compiler_path)
+                    .await
+                    .map_err(|e| SolcError::msg(format!("Failed to create output file: {e}")))?;
 
                 copy(&mut content.as_ref(), &mut output_file).await.map_err(|e| {
                     SolcError::msg(format!("Failed to write the downloaded file: {e}"))
@@ -472,6 +480,41 @@ impl<T: Into<PathBuf>> From<T> for ZkSolc {
     fn from(zksolc: T) -> Self {
         Self::new(zksolc.into())
     }
+}
+
+/// Creates the file and locks it exclusively, this will block if the file is currently locked
+fn try_lock_file(lock_path: PathBuf) -> Result<LockFile> {
+    use fs4::FileExt;
+    println!("Trying to take the lock");
+    let _lock_file = fs::OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .read(true)
+        .write(true)
+        .open(&lock_path)
+        .map_err(|_| SolcError::msg("Error creating lock file"))?;
+    _lock_file.lock_exclusive().map_err(|_| SolcError::msg("Error taking the lock"))?;
+    println!("Got the lock");
+    Ok(LockFile { lock_path, _lock_file })
+}
+
+/// Represents a lockfile that's removed once dropped
+struct LockFile {
+    _lock_file: fs::File,
+    lock_path: PathBuf,
+}
+
+impl Drop for LockFile {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.lock_path);
+    }
+}
+
+/// Returns the lockfile to use for a specific file
+fn lock_file_path(version: &Version) -> PathBuf {
+    ZkSolc::compilers_dir()
+        .expect("could not detect zksolc compilers directory")
+        .join(format!(".lock-zksolc-{version}"))
 }
 
 #[cfg(test)]
