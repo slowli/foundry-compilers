@@ -314,7 +314,9 @@ impl ZkSolc {
             let compiler_path = Self::compiler_path(version)?;
 
             let lock_file_dir = Self::compilers_dir()?;
-            std::fs::create_dir_all(lock_file_dir).map_err(|e| SolcError::msg(format!("Failed to create directory '{lock_file_dir}': {e}")));
+            std::fs::create_dir_all(&lock_file_dir).map_err(|e| {
+                SolcError::msg(format!("Failed to create directory '{lock_file_dir:?}': {e}"))
+            })?;
             let lock_file_path = lock_file_dir.join(format!(".download-lock-{version}"));
             println!("--> {:?} compiler path lockfile {lock_file_path:?}", std::time::SystemTime::now());
             let lock_file = std::fs::OpenOptions::new()
@@ -337,8 +339,6 @@ impl ZkSolc {
                 println!("--> {:?} compiler path exists : return early", std::time::SystemTime::now());
                 return Ok(compiler_path);
             }
-
-            
 
             let client = reqwest::Client::new();
             let response = client
@@ -364,7 +364,7 @@ impl ZkSolc {
                     .map_err(|e| SolcError::msg(format!("failed to download file: {e}")))?;
 
                 println!("--> {:?} compiler downloaded", std::time::SystemTime::now());
-                
+
                 copy(&mut content.as_ref(), &mut output_file).await.map_err(|e| {
                     SolcError::msg(format!("Failed to write the downloaded file: {e}"))
                 })?;
