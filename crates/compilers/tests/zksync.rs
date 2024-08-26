@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fs, path::PathBuf, str::FromStr};
 
+use alloy_primitives::Bytes;
 use foundry_compilers::{
     buildinfo::BuildInfo,
     cache::CompilerCache,
@@ -298,4 +299,40 @@ contract B { }
     project.project().cleanup().unwrap();
 
     assert!(!project.project().build_info_path().exists());
+}
+
+#[test]
+fn zksync_can_compile_yul_sample() {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .try_init()
+        .ok();
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/yul-sample");
+    let paths = ProjectPathsConfig::builder().sources(root);
+    let project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::new(paths).unwrap();
+
+    let compiled = zksync::project_compile(project.project()).unwrap();
+    compiled.assert_success();
+
+    let simple_store_artifact = compiled
+        .compiled_artifacts
+        .values()
+        .find_map(|contracts| {
+            contracts
+                .iter()
+                .find(|(name, _)| name.ends_with("SimpleStore.yul"))
+                .and_then(|(_, artifacts)| artifacts.first())
+        })
+        .expect("SimpleStore.yul artifact not found")
+        .artifact
+        .bytecode
+        .clone()
+        .unwrap();
+
+    let yul_bytecode = simple_store_artifact.object.as_bytes().unwrap();
+
+    let expected_bytecode = Bytes::from_str("0x00000001002001900000000c0000c13d000000002101043c0000000000100435000000200100043d0000000701100197000000000202043b0000000802200197000000000112019f000000200010043f0000000001000019000000000001042d000000240000043f0000002001000039000001000010044300000120000004430000000601000041000000130001042e0000001200000432000000130001042e0000001400010430000000000000000000000000000000000000000000000000000000020000000000000000000000000000004000000100000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007e29ac13118f5fe419367dc363d30b339540f7ac9ff1faccec3e73526efd43e7").unwrap();
+
+    // Assert bytecode equality
+    assert_eq!(*yul_bytecode, expected_bytecode, "SimpleStore.yul bytecode mismatch");
 }
