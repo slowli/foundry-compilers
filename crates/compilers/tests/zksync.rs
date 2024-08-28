@@ -311,7 +311,6 @@ fn zksync_cant_compile_a_file_outside_allowed_paths() {
     // └── contracts/
     //     ├── src/
     //     │   └── Main.sol
-    //     ├── foundry.toml
     //     └── remappings.txt
 
     let tmp_dir = tempfile::tempdir().unwrap();
@@ -352,12 +351,6 @@ contract Helper {
 pragma solidity ^0.8.0;
 contract Util {}
 "#,
-    )
-    .unwrap();
-
-    fs::write(
-        contracts_dir.path().join("foundry.toml"),
-        "[profile.default]\nsrc = \"src\"\nout = \"out\"\nlibs = [\"lib\"]\n",
     )
     .unwrap();
 
@@ -426,12 +419,6 @@ contract Helper {
 pragma solidity ^0.8.0;
 contract Util {}
 "#,
-    )
-    .unwrap();
-
-    fs::write(
-        contracts_dir.path().join("foundry.toml"),
-        "[profile.default]\nsrc = \"src\"\nout = \"out\"\nlibs = [\"lib\"]\n",
     )
     .unwrap();
 
