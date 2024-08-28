@@ -1,9 +1,9 @@
 object "SimpleStore" {
   code {
-    datacopy(0, dataoffset("runtime"), datasize("runtime"))
-    return(0, datasize("runtime"))
+    datacopy(0, dataoffset("Runtime"), datasize("Runtime"))
+    return(0, datasize("Runtime"))
   }
-  object "runtime" {
+  object "Runtime" {
     code {
       calldatacopy(0, 0, 36) // write calldata to memory
     }
