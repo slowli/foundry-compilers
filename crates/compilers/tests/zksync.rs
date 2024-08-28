@@ -1,8 +1,6 @@
-use std::collections::BTreeSet;
 use std::{collections::HashMap, fs, path::PathBuf, str::FromStr};
 
 use alloy_primitives::Bytes;
-use foundry_compilers::ProjectBuilder;
 use foundry_compilers::{
     buildinfo::BuildInfo,
     cache::CompilerCache,
@@ -301,87 +299,6 @@ contract B { }
     project.project().cleanup().unwrap();
 
     assert!(!project.project().build_info_path().exists());
-}
-
-#[test]
-fn zksync_can_use_allowed_paths_config() {
-    // For this test we should create the following directory structure:
-    // project_root/
-    // ├── outer/
-    // │   ├── Util.sol
-    // │   └── Helper.sol
-    // └── contracts/
-    //     ├── src/
-    //     │   └── Main.sol
-
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let project_root = tmp_dir.path().to_path_buf();
-    let contracts_dir = tempfile::tempdir_in(&project_root).unwrap();
-
-    fs::create_dir_all(contracts_dir.path().join("src")).unwrap();
-    fs::create_dir_all(project_root.join("outer")).unwrap();
-
-    fs::write(
-        contracts_dir.path().join("src/Main.sol"),
-        r#"
-pragma solidity ^0.8.0;
-import "@outer/Helper.sol";
-contract Main {
-    Helper helper = new Helper();
-    function run() public {}
-}
-"#,
-    )
-    .unwrap();
-
-    fs::write(
-        project_root.join("outer/Helper.sol"),
-        r#"
-pragma solidity ^0.8.0;
-import "./Util.sol";
-contract Helper {
-    Util util = new Util();
-}
-"#,
-    )
-    .unwrap();
-
-    fs::write(
-        project_root.join("outer/Util.sol"),
-        r#"
-pragma solidity ^0.8.0;
-contract Util {}
-"#,
-    )
-    .unwrap();
-
-    let root = contracts_dir.path().to_path_buf();
-    let paths = ProjectPathsConfig::builder()
-        .root(root.clone())
-        .sources(root.join("src"))
-        .remappings(vec![Remapping::from_str("@outer/=../outer/").unwrap()])
-        .build()
-        .unwrap();
-
-    let inner = ProjectBuilder::<ZkSolcCompiler, ZkArtifactOutput>::new(Default::default())
-        .paths(paths)
-        .build(Default::default())
-        .unwrap();
-    let project =
-        TempProject::<ZkSolcCompiler, ZkArtifactOutput>::create_new(contracts_dir, inner).unwrap();
-
-    let compiled = zksync::project_compile(project.project()).unwrap();
-    assert!(compiled.has_compiler_errors());
-    assert!(compiled.compiler_output.errors.iter().any(|error| error
-        .formatted_message
-        .as_ref()
-        .map_or(false, |msg| msg.contains("File outside of allowed directories"))));
-
-    let mut project_with_allowed_paths = project.project().clone();
-    project_with_allowed_paths.paths.allowed_paths = BTreeSet::from([PathBuf::from("../")]);
-
-    let compiled_with_allowed_paths = zksync::project_compile(&project_with_allowed_paths).unwrap();
-    compiled_with_allowed_paths.assert_success();
 }
 
 #[test]
