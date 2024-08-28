@@ -311,7 +311,6 @@ fn zksync_cant_compile_a_file_outside_allowed_paths() {
     // └── contracts/
     //     ├── src/
     //     │   └── Main.sol
-    //     └── remappings.txt
 
     let tmp_dir = tempfile::tempdir().unwrap();
     let project_root = tmp_dir.path().to_path_buf();
@@ -353,8 +352,6 @@ contract Util {}
 "#,
     )
     .unwrap();
-
-    fs::write(contracts_dir.path().join("remappings.txt"), "@outer/=../outer/").unwrap();
 
     let root = contracts_dir.path().to_path_buf();
     let paths = ProjectPathsConfig::builder()
@@ -421,8 +418,6 @@ contract Util {}
 "#,
     )
     .unwrap();
-
-    fs::write(contracts_dir.path().join("remappings.txt"), "@outer/=../outer/").unwrap();
 
     let root = contracts_dir.path().to_path_buf();
     let paths = ProjectPathsConfig::builder()
