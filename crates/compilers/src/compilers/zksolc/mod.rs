@@ -42,14 +42,18 @@ pub const ZKSOLC_VERSION: Version = Version::new(1, 5, 3);
 
 #[derive(Debug, Clone, Serialize)]
 enum ZkSolcOS {
-    Linux,
+    LinuxAMD64,
+    LinuxARM64,
     MacAMD,
     MacARM,
 }
 
 fn get_operating_system() -> Result<ZkSolcOS> {
     match std::env::consts::OS {
-        "linux" => Ok(ZkSolcOS::Linux),
+        "linux" => match std::env::consts::ARCH {
+            "aarch64" => Ok(ZkSolcOS::LinuxARM64),
+            _ => Ok(ZkSolcOS::LinuxAMD64),
+        },
         "macos" | "darwin" => match std::env::consts::ARCH {
             "aarch64" => Ok(ZkSolcOS::MacARM),
             _ => Ok(ZkSolcOS::MacAMD),
@@ -59,9 +63,10 @@ fn get_operating_system() -> Result<ZkSolcOS> {
 }
 
 impl ZkSolcOS {
-    fn get_compiler(&self) -> &str {
+    fn get_zksolc_prefix(&self) -> &str {
         match self {
-            Self::Linux => "zksolc-linux-amd64-musl-",
+            Self::LinuxAMD64 => "zksolc-linux-amd64-musl-",
+            Self::LinuxARM64 => "zksolc-linux-arm64-musl-",
             Self::MacAMD => "zksolc-macosx-amd64-",
             Self::MacARM => "zksolc-macosx-arm64-",
         }
@@ -69,17 +74,10 @@ impl ZkSolcOS {
 
     fn get_solc_prefix(&self) -> &str {
         match self {
-            Self::Linux => "solc-linux-amd64-",
+            Self::LinuxAMD64 => "solc-linux-amd64-",
+            Self::LinuxARM64 => "solc-linux-arm64-",
             Self::MacAMD => "solc-macosx-amd64-",
             Self::MacARM => "solc-macosx-arm64-",
-        }
-    }
-
-    fn get_download_uri(&self) -> &str {
-        match self {
-            Self::Linux => "linux-amd64-musl",
-            Self::MacAMD => "macosx-amd64",
-            Self::MacARM => "macosx-arm64",
         }
     }
 }
@@ -371,7 +369,7 @@ impl ZkSolc {
 
     fn compiler_path(version: &Version) -> Result<PathBuf> {
         let os = get_operating_system()?;
-        Ok(Self::compilers_dir()?.join(format!("{}v{}", os.get_compiler(), version)))
+        Ok(Self::compilers_dir()?.join(format!("{}v{}", os.get_zksolc_prefix(), version)))
     }
 
     fn solc_path(version_str: &str) -> Result<PathBuf> {
@@ -388,10 +386,10 @@ impl ZkSolc {
     #[cfg(feature = "async")]
     pub fn blocking_install(version: &Version) -> Result<Self> {
         let os = get_operating_system()?;
-        let os_namespace = os.get_download_uri();
+        let compiler_prefix = os.get_zksolc_prefix();
         let download_url = if version.pre.is_empty() {
             format!(
-                "https://github.com/matter-labs/zksolc-bin/releases/download/v{version}/zksolc-{os_namespace}-v{version}",
+                "https://github.com/matter-labs/zksolc-bin/releases/download/v{version}/{compiler_prefix}v{version}",
             )
         } else {
             let pre = version.pre.as_str();
@@ -400,7 +398,7 @@ impl ZkSolc {
             let version_str = version_str.split('-').next().unwrap();
             // Matter Labs uses a different repositiry for pre-releases
             format!(
-                "https://github.com/matter-labs/era-compiler-solidity/releases/download/{pre}/zksolc-{os_namespace}-v{version_str}",
+                "https://github.com/matter-labs/era-compiler-solidity/releases/download/{pre}/zksolc-{compiler_prefix}v{version_str}",
             )
         };
         let compilers_dir = Self::compilers_dir()?;
