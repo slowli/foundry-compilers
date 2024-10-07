@@ -38,7 +38,7 @@ pub use settings::ZkSolcSettings;
 
 pub const ZKSOLC: &str = "zksolc";
 pub const ZKSYNC_SOLC_RELEASE: Version = Version::new(1, 0, 1);
-pub const ZKSOLC_VERSION: Version = Version::new(1, 5, 3);
+pub const ZKSOLC_VERSION: Version = Version::new(1, 5, 4);
 
 #[derive(Debug, Clone, Serialize)]
 enum ZkSolcOS {
@@ -280,7 +280,7 @@ impl ZkSolc {
     pub fn solc_available_versions() -> Vec<Version> {
         let mut ret = vec![];
         let min_max_patch_by_minor_versions =
-            vec![(4, 12, 26), (5, 0, 17), (6, 0, 12), (7, 0, 6), (8, 0, 26)];
+            vec![(4, 12, 26), (5, 0, 17), (6, 0, 12), (7, 0, 6), (8, 0, 27)];
         for (minor, min_patch, max_patch) in min_max_patch_by_minor_versions {
             for i in min_patch..=max_patch {
                 ret.push(Version::new(0, minor, i));
@@ -634,7 +634,7 @@ mod tests {
 
     fn zksolc() -> ZkSolc {
         let mut zksolc = ZkSolc::new_from_version(&ZKSOLC_VERSION).unwrap();
-        let solc_version = "0.8.26";
+        let solc_version = "0.8.27";
 
         crate::take_solc_installer_lock!(_lock);
         let maybe_solc = ZkSolc::find_solc_installed_version(solc_version).unwrap();
