@@ -17,7 +17,6 @@ use std::{
 
 ///
 /// The Solidity compiler codegen.
-///
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Codegen {

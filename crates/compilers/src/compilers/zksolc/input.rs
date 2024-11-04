@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
     collections::HashSet,
-    mem,
     path::{Path, PathBuf},
 };
 
@@ -75,6 +74,9 @@ pub struct ZkSolcInput {
     pub language: SolcLanguage,
     pub sources: Sources,
     pub settings: ZkSettings,
+    // For `zksolc` versions <1.5.7, suppressed warnings / errors were specified on the same level
+    // as `settings`. For `zksolc` 1.5.7+, they are specified inside `settings`. Since we want to
+    // support both options at the time, we duplicate fields from `settings` here.
     #[serde(default, skip_serializing_if = "HashSet::is_empty")]
     pub suppressed_warnings: HashSet<ZkSolcWarning>,
     #[serde(default, skip_serializing_if = "HashSet::is_empty")]
@@ -95,9 +97,9 @@ impl Default for ZkSolcInput {
 }
 
 impl ZkSolcInput {
-    fn new(language: SolcLanguage, sources: Sources, mut settings: ZkSettings) -> Self {
-        let suppressed_warnings = mem::take(&mut settings.suppressed_warnings);
-        let suppressed_errors = mem::take(&mut settings.suppressed_errors);
+    fn new(language: SolcLanguage, sources: Sources, settings: ZkSettings) -> Self {
+        let suppressed_warnings = settings.suppressed_warnings.clone();
+        let suppressed_errors = settings.suppressed_errors.clone();
         Self { language, sources, settings, suppressed_warnings, suppressed_errors }
     }
 
