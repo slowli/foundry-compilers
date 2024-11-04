@@ -13,7 +13,7 @@ use foundry_compilers::{
     zksolc::{
         input::ZkSolcInput,
         settings::{ZkSolcError, ZkSolcWarning},
-        ZkSolcCompiler, ZkSolcSettings,
+        ZkSolc, ZkSolcCompiler, ZkSolcSettings,
     },
     zksync::{self, artifact_output::zk::ZkArtifactOutput},
     Graph, ProjectBuilder, ProjectPathsConfig,
@@ -51,13 +51,13 @@ fn zksync_can_compile_dapp_sample() {
     assert_eq!(cache, updated_cache);
 }
 
-#[test]
-fn zksync_can_compile_contract_with_suppressed_errors() {
+fn test_zksync_can_compile_contract_with_suppressed_errors(compiler: ZkSolcCompiler) {
     let _ = tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .try_init()
         .ok();
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
+    project.project_mut().compiler = compiler;
 
     project
         .add_source(
@@ -87,12 +87,26 @@ fn zksync_can_compile_contract_with_suppressed_errors() {
 }
 
 #[test]
-fn zksync_can_compile_contract_with_suppressed_warnings() {
+fn zksync_can_compile_contract_with_suppressed_errors() {
+    test_zksync_can_compile_contract_with_suppressed_errors(ZkSolcCompiler::default());
+}
+
+#[test]
+fn zksync_pre_1_5_7_can_compile_contract_with_suppressed_errors() {
+    let compiler = ZkSolcCompiler {
+        zksolc: ZkSolc::get_path_for_version(&semver::Version::new(1, 5, 6)).unwrap(),
+        solc: Default::default(),
+    };
+    test_zksync_can_compile_contract_with_suppressed_errors(compiler);
+}
+
+fn test_zksync_can_compile_contract_with_suppressed_warnings(compiler: ZkSolcCompiler) {
     let _ = tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .try_init()
         .ok();
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
+    project.project_mut().compiler = compiler;
 
     project
         .add_source(
@@ -136,6 +150,20 @@ fn zksync_can_compile_contract_with_suppressed_warnings() {
         "{:#?}",
         compiled.compiler_output.errors
     );
+}
+
+#[test]
+fn zksync_can_compile_contract_with_suppressed_warnings() {
+    test_zksync_can_compile_contract_with_suppressed_warnings(ZkSolcCompiler::default());
+}
+
+#[test]
+fn zksync_pre_1_5_7_can_compile_contract_with_suppressed_warnings() {
+    let compiler = ZkSolcCompiler {
+        zksolc: ZkSolc::get_path_for_version(&semver::Version::new(1, 5, 6)).unwrap(),
+        solc: Default::default(),
+    };
+    test_zksync_can_compile_contract_with_suppressed_warnings(compiler);
 }
 
 #[test]
