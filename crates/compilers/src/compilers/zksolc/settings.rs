@@ -15,6 +15,19 @@ use std::{
     str::FromStr,
 };
 
+///
+/// The Solidity compiler codegen.
+///
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Codegen {
+    /// The Yul IR.
+    #[default]
+    Yul,
+    /// The EVM legacy assembly IR.
+    EVMLA,
+}
+
 /// `zksolc` warnings that can be suppressed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -44,6 +57,9 @@ pub struct ZkSettings {
     /// false by default.
     #[serde(rename = "viaIR", default, skip_serializing_if = "Option::is_none")]
     pub via_ir: Option<bool>,
+    /// The Solidity codegen.
+    #[serde(default)]
+    pub codegen: Codegen,
     // TODO: era-compiler-solidity uses a BTreeSet of strings. In theory the serialization
     // should be the same but maybe we should double check
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -168,6 +184,7 @@ impl Default for ZkSettings {
             enable_eravm_extensions: false,
             llvm_options: Default::default(),
             force_evmla: false,
+            codegen: Default::default(),
             suppressed_errors: Default::default(),
             suppressed_warnings: Default::default(),
         }
@@ -195,6 +212,7 @@ impl CompilerSettings for ZkSolcSettings {
                     enable_eravm_extensions,
                     llvm_options,
                     force_evmla,
+                    codegen,
                     suppressed_warnings,
                     suppressed_errors,
                 },
@@ -212,6 +230,7 @@ impl CompilerSettings for ZkSolcSettings {
             && *enable_eravm_extensions == other.settings.enable_eravm_extensions
             && *llvm_options == other.settings.llvm_options
             && *force_evmla == other.settings.force_evmla
+            && *codegen == other.settings.codegen
             && *suppressed_warnings == other.settings.suppressed_warnings
             && *suppressed_errors == other.settings.suppressed_errors
     }
